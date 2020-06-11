@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import time
 # ===== global value======
 Obstacle_list = list()
 Robot_list = list() #[initial_robot,final_robot,initial_robot,final_robot......]
@@ -14,7 +15,8 @@ map_obstacle_list = list()
 map_cp_list = list()
 g_PtField1 = list()
 g_PtField2 = list()
-# ====== ARRANGE DATA =================
+obstacleshowed,robotshowed=False,False
+# ====== ARRANGE DATA =========================
 with open("obstacle.txt","r") as f:
     data = f.readlines()
 with open("robot.txt","r") as f2:
@@ -27,7 +29,8 @@ W2 = list() #robot
 for i in data2:
     if(i[0]!='#'):
         W2.append(i)
-# Obstacle list
+
+# ======== Obstacle list ======================
 index,index2 = 0,0
 for i in range(int(W[index])):
     index+=1
@@ -48,7 +51,8 @@ for i in range(int(W[index])):
     b = W[index].split()
     obstacle.Addcon(float(b[0]),float(b[1]),float(b[2]))
     Obstacle_list.append(obstacle)
-# Robot list
+
+# ========= Robot list ========================
 for i in range(int(W2[index2])):
     index2 += 1
     init_robot = Robot("r1")
@@ -87,6 +91,7 @@ for i in range(int(W2[index2])):
     Robot_list.append(init_robot)
     Robot_list.append(final_robot)
 obstacle_bt,robot_bt = False,False
+
 # ==== CANVAS CONVERT and SHOW ================
 cv_ObstacleList,cv_OLineList = list(),list()
 def ShowObtacle(move=0,index=0,clockwise=False): #delete obstacle[index]
@@ -186,8 +191,7 @@ def ShowRobot(move=0,index=0,clockwise=False):
     cv.pack()
 # ========== MOUSE EVENT =============================
 p_x,p_y,first,dx,dy,delete_index,type=0,0,0,0,0,0,0
-# to check which element is selected
-# move motion
+# to check which element is selected and move motion
 def motion(event):
     global p_x,p_y,first,dx,dy,obstacle_bt,robot_bt
     global delete_index,type
@@ -242,7 +246,8 @@ def release(event):
         robot.selected = False
 rtype,rdelete_index=0,-1
 rselected = False
-# rotate motion
+
+# ========= rotate motion ===============
 def rmotion(event):
     global rtype,rdelete_index,rselected,obstacle_bt,robot_bt
     x = event.x
@@ -288,26 +293,34 @@ def rotate(event):
                 ShowObtacle(2,rdelete_index,False)
             if rtype==2:
                 ShowRobot(2,rdelete_index,False)
-# ==========button func==================
 
+# ==========button func==================
 def bt_start():
     showPtfield()
-    BFS(Obstacle_list, Robot_list,g_PtField1,g_PtField2)
-
-
-
-obstacleshowed,robotshowed=False,False
+    CanvasRemove(cv_RLineList,cv)
+    all_node = list()
+    if(BFS(Obstacle_list, Robot_list,g_PtField1,g_PtField2,all_node)):
+        print("success")
+        for node in all_node:
+            time.sleep(0.035)
+            robot_animate(cv_RobotList,Robot_list,cv,node,cv_RLineList)
+    else:
+        print("fail")
+# ======Show obstacles on canvas
 def bt_showObstacle():
     global obstacleshowed
     if obstacleshowed==False:
         ShowObtacle(0,0)
         obstacleshowed=True
+
+# ======Show robot on canvas =========
 def bt_showRobot():
     global robotshowed
     if robotshowed==False:
         ShowRobot(0,0)
         robotshowed=True
-# ======canvas to planner convert ======
+
+# ======Canvas to planner convert ======
 def convert_planner():
     map_robot_list.clear()
     map_cp_list.clear()
@@ -359,15 +372,19 @@ def convert_planner():
         map_obstacle.bdbox.append(cconvert_y(obstacle.con, obstacle.bdbox[2], obstacle.bdbox[3]))
 
         map_obstacle_list.append(map_obstacle)
+
 # ==========Potiential Field ========
 def showPtfield():
     if(len(g_PtField1)==0):
         for i in range(128):
             field = list()
+            field2 = list()
             for j in range(128):
                 field.append(0)
+                field2.append(0)
             g_PtField1.append(field)
-            g_PtField2.append(field)
+            g_PtField2.append(field2)
+
     PtField = list()
     for i in range(128):
         Field = list()
@@ -452,7 +469,6 @@ def showPtfield():
     #                 t_x = int((i/1000)*v_x+x1)
     #                 t_y = int((i/1000)*v_y+y1)
     #                 PtField[t_x][t_y] = fill
-
     PtField2 = list()
     for i in range(128):
         PtField2_row = list()
@@ -464,12 +480,11 @@ def showPtfield():
         x = int(map_cp_list[i].pos[0])
         y = int(map_cp_list[i].pos[1])
         if i==2:
-            PtField[x][y] = -1
+            PtField[x][y] = 0
             PFrun(PtField,x,y)
         if i==3:
-            PtField2[x][y] = -1
+            PtField2[x][y] = 0
             PFrun(PtField2,x,y)
-
     cv.pack()
 
     # fig = plt.figure()
@@ -481,29 +496,31 @@ def showPtfield():
     #         else:
     #             ax.scatter(i,j,PtField[i][j],color = 'black',s=0.1)
     # plt.show()
+    # print(PtField[64][76])
+    # print(PtField2[64][62])
 
     for i in range(128):
         for j in range(128):
             g_PtField1[i][j] = PtField[i][j]
             g_PtField2[i][j] = PtField2[i][j]
 
+    pd.DataFrame(g_PtField1).to_csv("output.csv")
+    pd.DataFrame(g_PtField2).to_csv("output2.csv")
+    # print("done")
 
-    pd.DataFrame(PtField).to_csv("output.csv")
-    pd.DataFrame(PtField2).to_csv("output2.csv")
-    print("done")
 if __name__ == '__main__':
     window = Tk() #mp
     window.geometry("400x440")
     window.title("Motion Planning")
     canvas_frame = Frame(window)
     canvas_frame.pack()
-    cv = Canvas(canvas_frame,bg='#CFD8DC',width=400, height=400)
+    cv = Canvas(canvas_frame,bg='#FFFAFA',width=400, height=400)
     cv.pack()
     # button
-    start_bt = Button(window,text='start',font=('Arial',8),bg="#e57373", width=15,height=1,command=bt_start)
-    Obstacle_bt = Button(window,text='Show obstacle',font=('Arial',8),bg="#64B5F6", width=15,height=1,command=bt_showObstacle)
-    Robot_bt = Button(window,text='Show robot',font=('Arial',8),bg="#64B5F6", width=15,height=1,command=bt_showRobot)
-    Ptfield_bt = Button(window,text='Show PTField',font=('Arial',8),bg="#64B5F6",width=15,height=1,command=showPtfield)
+    start_bt = Button(window,text='Start',font=('Arial',8),bg="#FFA07A", width=15,height=1,command=bt_start)
+    Obstacle_bt = Button(window,text='Obstacle',font=('Arial',8),bg="#87CEFA", width=15,height=1,command=bt_showObstacle)
+    Robot_bt = Button(window,text='Robot',font=('Arial',8),bg="#87CEFA", width=15,height=1,command=bt_showRobot)
+    Ptfield_bt = Button(window,text='PTField',font=('Arial',8),bg="#87CEFA",width=15,height=1,command=showPtfield)
     Ptfield_bt.pack(side=RIGHT,padx=1,pady=3)
     Robot_bt.pack(side=RIGHT,padx=1,pady=3)
     Obstacle_bt.pack(side=RIGHT,padx=1,pady=3)

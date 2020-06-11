@@ -2,11 +2,12 @@ import math
 import sys
 from Class_Define import *
 import copy
-
+from tkinter import *
 
 def CanvasRemove(list,cv):
     for index in range(len(list)):
         cv.delete(list[index])
+# ============= action ===================================
 def path(cv_targetlist, cv_linelist, targetlist,index,canvas,dx,dy):
     CanvasRemove(cv_targetlist[index],canvas)
     canvas.delete(cv_linelist[index])
@@ -30,14 +31,9 @@ def path(cv_targetlist, cv_linelist, targetlist,index,canvas,dx,dy):
         else:
             targetlist[index].bdbox[i] = targetlist[index].bdbox[i] - dy*128/400
             n_bdbox.append(400-targetlist[index].bdbox[i]*(400/128))
-
     c_line = canvas.create_line(n_bdbox,fill='red')
     cv_linelist[index] = c_line
     cv_targetlist[index] = cv_polygon
-def cconvert_x(con,x,y):
-    return  con[0]+math.cos(math.radians(con[2]))*x - math.sin(math.radians(con[2]))*y
-def cconvert_y(con,x,y):
-    return  con[1]+math.sin(math.radians(con[2]))*x + math.cos(math.radians(con[2]))*y
 def rotation(cv_targetlist, cv_linelist, targetlist,index,canvas,clockwise):
     CanvasRemove(cv_targetlist[index],canvas)
     canvas.delete(cv_linelist[index])
@@ -85,6 +81,8 @@ def rotation(cv_targetlist, cv_linelist, targetlist,index,canvas,clockwise):
     c_line = canvas.create_line(n_bdbox,fill='red')
     cv_linelist[index] = c_line
     cv_targetlist[index] = cv_polygon
+
+# ============= PtField ====================================
 def direction(c_x,c_y,dir,field,current):
     n_x,n_y=0,0
     if(dir==0):
@@ -124,6 +122,8 @@ def PFrun(field,x,y):
         #right
         direction(c_x, c_y, 3,field,current)
         del current[0]
+
+# ========== convert function ==============================
 def map_x(x):
     return x*128/400
 def map_y(y):
@@ -132,11 +132,20 @@ def canvas_x(x):
     return x*400/128
 def canvas_y(y):
     return 400-y*400/128
+def cconvert_x(con,x,y):
+    return  con[0]+math.cos(math.radians(con[2]))*x - math.sin(math.radians(con[2]))*y
+def cconvert_y(con,x,y):
+    return  con[1]+math.sin(math.radians(con[2]))*x + math.cos(math.radians(con[2]))*y
 
+# ================== collision ============================
 def bdbox_collision(x0,y0,x1,y1,a0,b0,a1,b1):
     if (x1>=a0 and x0<=a1 and y1>=b0 and y0<=b1):
         #print("bdbox_collision")
         return 1
+    if(x0>127 or x0<0 or x1>127 or x1<0 or y0>127 or y0<0 or y1>127 or y1<0):
+        return 2
+    if(a0>127 or a0<0 or a1>127 or a1<0 or b0>127 or b0<0 or b1>127 or b1<0):
+        return 2
     else:
         return 0
 #p0,p1,p2,p3 are vertice objects
@@ -155,25 +164,46 @@ def vertice_collision(p0,p1,p2,p3):
         return 1
     else:
         return 0
-
 def collision(obstaclelist,robotlist):
     #bdbox check first
+    # print("check")
+    # print(robotlist[0].con)
+    # update bounded box !===
+    new_bdbox = [sys.float_info.max, sys.float_info.max, sys.float_info.min, sys.float_info.min]
+    for polygon in robotlist[0].poly:
+        for vertice in polygon.ver:
+            x = vertice.pos[0]
+            y = vertice.pos[1]
+            c_x = cconvert_x(robotlist[0].con, x, y)
+            c_y = cconvert_y(robotlist[0].con, x, y)
+            if c_x < new_bdbox[0]:
+                new_bdbox[0] = c_x
+            if c_x > new_bdbox[2]:
+                new_bdbox[2] = c_x
+            if c_y < new_bdbox[1]:
+                new_bdbox[1] = c_y
+            if c_y > new_bdbox[3]:
+                new_bdbox[3] = c_y
+
+    for i in range(4):
+        # print(new_bdbox[i])
+        robotlist[0].bdbox[i] = new_bdbox[i]
+    # =======================
     collide = False
     all_bdbox = list()
     for obstacle in obstaclelist:
         all_bdbox.append(obstacle.bdbox)
     for i in range(2):
         all_bdbox.append(robotlist[i].bdbox)
-
-
-
     for bd_i in range(len(all_bdbox)):
         for bd_j in range(bd_i+1,len(all_bdbox)):
             o1 = 0  # if is robot = 1 ,obstacle = -1
-            o2 = 0
             a = all_bdbox[bd_i]
             b = all_bdbox[bd_j]
-            if(bdbox_collision(a[0],a[1],a[2],a[3],b[0],b[1],b[2],b[3])):
+            if(bdbox_collision(a[0],a[1],a[2],a[3],b[0],b[1],b[2],b[3])==2):
+                collide= True
+                # print("boundary collection")
+            elif(bdbox_collision(a[0],a[1],a[2],a[3],b[0],b[1],b[2],b[3])==1):
                 if(bd_i>=len(obstaclelist)):
                     obj1 = robotlist[bd_i-len(obstaclelist)]
                     o1=1
@@ -186,7 +216,6 @@ def collision(obstaclelist,robotlist):
                 else:
                     obj2 = obstaclelist[bd_j]
                     o2=-1
-
                 if o1*o2<0:
                     objlist = list()
                     objlist.append(obj1)
@@ -223,42 +252,48 @@ def collision(obstaclelist,robotlist):
                             if(vertice_collision(obj1_v[0],obj1_v[1],obj2_v[0],obj2_v[1])):
                                 collide = True
     return collide
-
 #input configuration, control point, PTField // output U(q)
+
+# =================== BFS ==============================
 def Arbitration(PtField,PtField2,x0,y0,x1,y1,con):
     c_x0 = int(cconvert_x(con,x0,y0))
     c_y0 = int(cconvert_y(con,x0,y0))
     c_x1 = int(cconvert_x(con,x1,y1))
     c_y1 = int(cconvert_y(con,x1,y1))
+    # print("x,y is",c_x0,c_y0,c_x1,c_y1)
+    # print("pt is",PtField[c_x0][c_y0],PtField2[c_x1][c_y1])
     return 0.9*PtField[c_x0][c_y0] + 0.1*PtField2[c_x1][c_y1]
-
-
 def Empty(Tree):   #if empty return 1
-    for i in range(255):
+    for i in range(256):
         if len(Tree[i])>0:
             return 0
     return 1
-
 def First(Tree):
     min=-1
-    for i in range(255):
+    for i in range(256):
         if len(Tree[i])!=0:
             min = i
             break
-    print(min)
+    # print(min)
     return Tree[min][0]
-
+def First(Tree):
+    min=-1
+    for i in range(256):
+        if len(Tree[i])!=0:
+            min = i
+            break
+    # print(min)
+    return Tree[min][0]
 def delfirst(Tree):
     min = -1
-    for i in range(255):
+    for i in range(256):
         if len(Tree[i])!=0:
             min = i
             break
     del Tree[min][0]
-
-def BFS(obstaclelist,robotlist,PtField1,PtField2):
+def BFS(obstaclelist,robotlist,PtField1,PtField2,all_node):
     Tree = list()
-    for i in range(255):
+    for i in range(256):
         nodes = list()
         Tree.append(nodes)
 
@@ -280,60 +315,112 @@ def BFS(obstaclelist,robotlist,PtField1,PtField2):
     #initial position and U
     U = Arbitration(PtField1, PtField2, s_robot_c0.pos[0], s_robot_c0.pos[1], s_robot_c1.pos[0], s_robot_c1.pos[1],
                     robotlist[0].con)
-    init_node = ListNode(robotlist[0].con,U)
-    print("u is ",U)
-    Tree[int(U)-1].append(init_node)
 
+    for i in range(3):
+        robotlist[0].con[i] = int(robotlist[0].con[i])
+
+    init_node = ListNode(robotlist[0].con,U)
+    # print("u is ",U)
+
+    Tree[int(U)].append(init_node)
+
+    # print("array pos is",int(U))
     #mark it
     x = int(robotlist[0].con[0])
     y = int(robotlist[0].con[1])
     d = int(robotlist[0].con[2])
     mark[x][y][d] = 1
-
+    success=0
+    time=0
     #start loop
-    while(Empty(Tree)==0 ):
-
+    while(Empty(Tree)==0 and success==0):
+        time+=1
         c_node = First(Tree)
+        delfirst(Tree)
         c_con = c_node.configuration
-        robotlist2 = copy.deepcopy(robotlist)
-        dx = [+3, -3, 0, 0, 0, 0]
-        dy = [0, 0, +3, -3, 0, 0]
+        dx = [+1, -1, 0, 0, 0, 0]
+        dy = [0, 0, +1, -1, 0, 0]
         dd = [0, 0, 0, 0, +10, -10]
-        print("current is",c_con[0], c_con[1], c_con[2])
-
+        #print("current is",c_con[0], c_con[1], c_con[2])
         for i in range(6):
+            robotlist2 = copy.deepcopy(robotlist)
             n_x = int(c_con[0])+dx[i]
             n_y = int(c_con[1])+dy[i]
             n_d = int(c_con[2])+dd[i]
+            if(n_d>=360):
+                n_d-=360
+            if(n_d<0):
+                n_d+=360
+            if(n_x>=128):
+                n_x-=128
+            if(n_x<0):
+                n_x+=128
+            if(n_y>=128):
+                n_y-=128
+            if(n_y<0):
+                n_y+=128
             # print("next is", n_x, n_y, n_d)
             if(mark[n_x][n_y][n_d]==0):
-                # print("next is unmark")
+                #print("next is unmark")
                 n_con = [n_x,n_y,n_d]
-                for i in range(3):
-                    robotlist2[0].con[i] = n_con[i]
-                if(collision(obstaclelist,robotlist2)):
-                    pass
+                n_c0_x = cconvert_x(n_con,s_robot_c0.pos[0],s_robot_c0.pos[1])
+                n_c0_y = cconvert_y(n_con,s_robot_c0.pos[0],s_robot_c0.pos[1])
+                n_c1_x = cconvert_x(n_con,s_robot_c1.pos[0],s_robot_c1.pos[1])
+                n_c1_y = cconvert_y(n_con,s_robot_c1.pos[0],s_robot_c1.pos[1])
+                if (n_c0_x>=127 or n_c0_x<0 or n_c0_y>=127 or n_c0_y<0 or n_c1_x>=127 or n_c1_x<0 or n_c1_y>=127 or n_c1_y<0):
+                    # print("here")
+                    continue
                 else:
-                    # print("valid next is",n_con[0],n_con[1],n_con[2])
+                    for i in range(3):
+                        robotlist2[0].con[i] = n_con[i]
+                    if(collision(obstaclelist,robotlist2)):
+                        # print("collision")
+                        continue
+                    else:
+                        # print("valid next is",n_con[0],n_con[1],n_con[2])
+                        U = Arbitration(PtField1, PtField2, s_robot_c0.pos[0], s_robot_c0.pos[1], s_robot_c1.pos[0],
+                                        s_robot_c1.pos[1],n_con)
+                        # print("U is",U)
+                        if(U==0):
+                            # print("find")
+                            # print(n_con)
+                            goal_node=ListNode(n_con,U)
+                            goal_node.previous = c_node
+                            all_node.append(goal_node)
+                            success +=1
+                        else:
+                            next_node = ListNode(n_con,U)
+                            next_node.previous = c_node
+                            # print("u is",int(U))
+                            Tree[int(U)].insert(0,next_node)
+                    mark[n_x][n_y][n_d]=1
+            else:
+                pass
+                # print("it has been marked",n_x,n_y,n_d)
+    if success:
+        while (1):
+            # print(all_node[0].configuration)
+            if (all_node[0].previous == None):
+                break
+            all_node.insert(0, all_node[0].previous)
+        return 1
+    else:
+        return 0
 
-                    U = Arbitration(PtField1, PtField2, s_robot_c0.pos[0], s_robot_c0.pos[1], s_robot_c1.pos[0],
-                                    s_robot_c1.pos[1],n_con)
-                    if(U==0):
-                        print("find")
-
-                    next_node = ListNode(n_con,U)
-                    next_node.previous = c_node
-                    Tree[int(U)-1].insert(0,next_node)
-                mark[n_x][n_y][n_d]=1
-
-        delfirst(Tree)
 
 
-
-
-
-
-
-
-
-
+# ================ animate ===========================
+def robot_animate(cv_targetlist,targetlist,canvas,node,cv_linelist):
+    CanvasRemove(cv_targetlist[0],canvas)
+    cv_polygon = list()
+    for polygon in targetlist[0].poly:
+        all_vertice = list()
+        for vertice in polygon.ver:
+            c_x = cconvert_x(node.configuration,vertice.pos[0],vertice.pos[1])
+            c_y = cconvert_y(node.configuration,vertice.pos[0],vertice.pos[1])
+            all_vertice.append(c_x*400/128)
+            all_vertice.append(400-c_y*(400/128))
+        c_poly = canvas.create_polygon(all_vertice,fill=targetlist[0].color)
+        cv_polygon.append(c_poly)
+    cv_targetlist[0] = cv_polygon
+    canvas.update()
