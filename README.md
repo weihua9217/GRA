@@ -8,3 +8,5 @@ motion planning in 2020 (IMLab)
   `使用Tkinter實作GUI`
   
   `使用BFS演算法`
+
+  `demo影片 在 demo folder`
