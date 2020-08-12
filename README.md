@@ -1,5 +1,5 @@
 # GRA
-IMLab's HW - motion planning in 2020
+motion planning in 2020 (IMLab)
 
 使用Python實作路徑規劃，輸入機器人和障礙物的起始位置及大小
 
