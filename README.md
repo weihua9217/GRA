@@ -1,8 +1,10 @@
 # GRA
 IMLab's HW - motion planning in 2020
 
-使用Python實作路徑規劃，輸入機器人和障礙物的起始位置及大小，即可使機器人避開障礙物，找出起點到終點的路徑。
+使用Python實作路徑規劃，輸入機器人和障礙物的起始位置及大小
 
-使用Tkinter實作GUI
+即可使機器人避開障礙物，找出起點到終點的路徑。
 
-使用BFS演算法
+  `使用Tkinter實作GUI
+  
+  `使用BFS演算法
