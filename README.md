@@ -5,6 +5,6 @@ IMLab's HW - motion planning in 2020
 
 即可使機器人避開障礙物，找出起點到終點的路徑。
 
-  `使用Tkinter實作GUI
+  `使用Tkinter實作GUI`
   
-  `使用BFS演算法
+  `使用BFS演算法`
